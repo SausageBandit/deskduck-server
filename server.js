@@ -3,7 +3,7 @@ const axios = require('axios');
 const app = express();
 
 const DUCK_IP = '172.20.10.7';
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.text());
 app.use(express.urlencoded({ extended: true }));
@@ -12,7 +12,7 @@ app.use(express.json());
 app.post('/', async (req, res) => {
   console.log('Threshold received from extension:', req.body);
   try {
-    const response = await axios.get(`http://${DUCK_IP}/quack`);
+    const response = await axios.get(`http://${DUCK_IP}/quack`, { timeout: 5000 });
     console.log('Duck responded:', response.data);
     res.send('Quack sent to duck!');
   } catch (err) {
@@ -23,7 +23,7 @@ app.post('/', async (req, res) => {
 
 app.get('/test', async (req, res) => {
   try {
-    const response = await axios.get(`http://${DUCK_IP}/quack`);
+    const response = await axios.get(`http://${DUCK_IP}/quack`, { timeout: 5000 });
     res.send('Test quack sent! Duck said: ' + response.data);
   } catch (err) {
     res.status(500).send('Could not reach duck: ' + err.message);
