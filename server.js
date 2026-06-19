@@ -1,36 +1,47 @@
 const express = require('express');
-const axios = require('axios');
 const app = express();
 
-const DUCK_IP = '172.20.10.7';
 const PORT = process.env.PORT || 3000;
 
 app.use(express.text());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-app.post('/', async (req, res) => {
+// In-memory store: which ducks have a quack waiting
+const pendingQuacks = {};
+
+// Extension calls this when a threshold is hit
+app.post('/', (req, res) => {
   console.log('Threshold received from extension:', req.body);
-  try {
-    const response = await axios.get(`http://${DUCK_IP}/quack`, { timeout: 5000 });
-    console.log('Duck responded:', response.data);
-    res.send('Quack sent to duck!');
-  } catch (err) {
-    console.error('Failed to reach duck:', err.message);
-    res.status(500).send('Could not reach duck');
+  const duckId = 'duck1'; // single duck for now
+  pendingQuacks[duckId] = true;
+  res.send('Quack queued for duck!');
+});
+
+// Duck calls this repeatedly asking "anything for me?"
+app.get('/poll', (req, res) => {
+  const duckId = req.query.id || 'duck1';
+  if (pendingQuacks[duckId]) {
+    pendingQuacks[duckId] = false;
+    console.log(`Duck ${duckId} polled — sending QUACK`);
+    res.send('QUACK');
+  } else {
+    res.send('NONE');
   }
 });
 
-app.get('/test', async (req, res) => {
-  try {
-    const response = await axios.get(`http://${DUCK_IP}/quack`, { timeout: 5000 });
-    res.send('Test quack sent! Duck said: ' + response.data);
-  } catch (err) {
-    res.status(500).send('Could not reach duck: ' + err.message);
-  }
+// Manual quack from the app, also queues it
+app.post('/manual-quack', (req, res) => {
+  const duckId = 'duck1';
+  pendingQuacks[duckId] = true;
+  console.log('Manual quack queued');
+  res.send('Quack queued!');
+});
+
+app.get('/test', (req, res) => {
+  res.send('Server is alive. Ducks connected: ' + Object.keys(pendingQuacks).length);
 });
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`DeskDuck relay server running on port ${PORT}`);
-  console.log(`Duck IP: ${DUCK_IP}`);
 });
