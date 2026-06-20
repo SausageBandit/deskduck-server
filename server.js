@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+const DAILY_SEND_LIMIT = 50;
 
 app.use(express.text());
 app.use(express.urlencoded({ extended: true }));
@@ -9,12 +10,17 @@ app.use(express.json());
 
 const ducks = {};
 const claims = {};
+const sendCounts = {};
 
 function ensureDuck(duckId) {
   if (!ducks[duckId]) {
     ducks[duckId] = { quackType: null, lastSeen: null, firstSeen: Date.now() };
   }
   return ducks[duckId];
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 app.post('/quack', (req, res) => {
@@ -27,11 +33,23 @@ app.post('/quack', (req, res) => {
 });
 
 app.post('/send-quack', (req, res) => {
-  const duckId = req.body.duckId || req.query.duckId;
+  const duckId = req.body.duckId;
+  const senderDuckId = req.body.senderDuckId;
   if (!duckId) return res.status(400).send('Missing duckId');
+
+  if (senderDuckId) {
+    const key = `${senderDuckId}:${todayKey()}`;
+    const count = sendCounts[key] || 0;
+    if (count >= DAILY_SEND_LIMIT) {
+      console.log(`Sender ${senderDuckId} hit daily send limit`);
+      return res.status(429).json({ error: 'limit_reached' });
+    }
+    sendCounts[key] = count + 1;
+  }
+
   const duck = ensureDuck(duckId);
   duck.quackType = 'sent';
-  console.log(`Sent quack (special tone) queued for ${duckId}`);
+  console.log(`Sent quack (special tone) queued for ${duckId}, from ${senderDuckId || 'unknown'}`);
   res.send('Sent quack queued!');
 });
 
