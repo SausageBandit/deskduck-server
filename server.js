@@ -8,10 +8,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 const ducks = {};
+const claims = {};
 
 function ensureDuck(duckId) {
   if (!ducks[duckId]) {
-    ducks[duckId] = { quackType: null, lastSeen: null };
+    ducks[duckId] = { quackType: null, lastSeen: null, firstSeen: Date.now() };
   }
   return ducks[duckId];
 }
@@ -57,6 +58,29 @@ app.get('/status', (req, res) => {
   }
   const secondsAgo = Math.round((Date.now() - ducks[duckId].lastSeen) / 1000);
   res.json({ online: secondsAgo < 10, secondsAgo: secondsAgo });
+});
+
+app.post('/register', (req, res) => {
+  const duckId = req.body.duckId;
+  const claimToken = req.body.claimToken;
+  if (!duckId || !claimToken) return res.status(400).send('Missing fields');
+  claims[claimToken] = { duckId: duckId, timestamp: Date.now() };
+  ensureDuck(duckId);
+  console.log(`Duck ${duckId} registered with claim token`);
+  res.send('Registered');
+});
+
+app.get('/claim-status', (req, res) => {
+  const token = req.query.token;
+  if (!token || !claims[token]) {
+    return res.json({ found: false });
+  }
+  const claim = claims[token];
+  const ageMs = Date.now() - claim.timestamp;
+  if (ageMs > 5 * 60 * 1000) {
+    return res.json({ found: false });
+  }
+  res.json({ found: true, duckId: claim.duckId });
 });
 
 app.get('/test', (req, res) => {
